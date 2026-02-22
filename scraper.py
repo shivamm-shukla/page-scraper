@@ -142,7 +142,7 @@ def count_common_bits(fingerprint_a, fingerprint_b):
 def print_results(title, body_text, links, simhash):
     print(f"TITLE: {title}")
     print(f"BODY: {body_text}")
-    print(f"SIMHASH: {simhash:016x}")
+    print(f"SIMHASH: {simhash:064b}")
     for link in links:
         print(f"LINK: {link}")
 
@@ -150,16 +150,16 @@ def print_results(title, body_text, links, simhash):
 def print_results_with_prefix(prefix, title, body_text, links, simhash):
     print(f"{prefix}_TITLE: {title}")
     print(f"{prefix}_BODY: {body_text}")
-    print(f"{prefix}_SIMHASH: {simhash:016x}")
+    print(f"{prefix}_SIMHASH: {simhash:064b}")
     for link in links:
         print(f"{prefix}_LINK: {link}")
 
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python scraper.py <URL> [URL2]", file=sys.stderr)
-        print("Example: python scraper.py https://example.com", file=sys.stderr)
-        print("Example: python scraper.py https://a.com https://b.com", file=sys.stderr)
+        print("Usage: python scraper.py <URL1> <URL2>", file=sys.stderr)
+        print("Example: python scraper.py https://sitare.org.", file=sys.stderr)
+        print("Example: python scraper.py https://sitare.org https://example.com", file=sys.stderr)
         sys.exit(1)
 
     url = sys.argv[1]
@@ -175,6 +175,7 @@ def main():
                 "URL2", second_title, second_body_text, second_links, second_simhash
             )
             common_bits = count_common_bits(simhash, second_simhash)
+            print()
             print(f"COMMON_BITS: {common_bits}")
         else:
             print_results(title, body_text, links, simhash)
