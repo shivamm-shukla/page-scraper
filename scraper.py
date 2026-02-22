@@ -1,6 +1,4 @@
-import re
 import sys
-
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -12,12 +10,18 @@ def normalize_url(url):
     return f"https://{url}"
 
 
-def fetch_html(url, timeout=10):
+def fetch_html(url):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
-    response = requests.get(url, headers=headers, timeout=timeout)
-    response.raise_for_status()
+
+    response = requests.get(url, headers=headers, timeout = 10)
+
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to fetch {url}. Status Code: {response.status_code}"
+        )
+
     return response.text
 
 
@@ -29,18 +33,20 @@ def extract_title(soup):
 
 
 def extract_body_text(soup):
-    for script in soup(["script", "style"]):
-        script.decompose()
+    for script_or_style in soup.find_all(["script", "style"]):
+        script_or_style.decompose()
     body = soup.find("body")
-    target = body if body else soup
-    return target.get_text(separator=" ", strip=True)
+    if body:
+        return body.get_text(separator = " ", strip = True)
+    else:
+        return ""
 
 
 def extract_links(soup, base_url):
     links = set()
-    for link in soup.find_all("a", href=True):
-        href = link["href"]
-        absolute_url = urljoin(base_url, href)
+    for anchor_tag in soup.find_all("a", href=True):
+        link = anchor_tag["href"]
+        absolute_url = urljoin(base_url, link)
         if absolute_url.startswith("http://") or absolute_url.startswith("https://"):
             links.add(absolute_url)
     return sorted(links)
@@ -56,15 +62,32 @@ def scrape_page(url):
     return title, body_text, links
 
 
-def tokenize_words(text):
-    return re.findall(r"[A-Za-z0-9]+", text.lower())
+def build_word_weight_map(input_text):
+    text = input_text.lower()
+    words_with_weights = {}
 
+    current_word = ""
+    inside_word = False
 
-def word_frequencies(text):
-    frequencies = {}
-    for word in tokenize_words(text):
-        frequencies[word] = frequencies.get(word, 0) + 1
-    return frequencies
+    for ch in text:
+        if ch.isalnum():
+            if not inside_word:
+                inside_word = True
+                current_word = ch
+            else:
+                current_word += ch
+        else:
+            if inside_word:
+                words_with_weights[current_word] = words_with_weights.get(current_word, 0) + 1
+                current_word = ""
+                inside_word = False
+    
+    # for the last word
+    if inside_word:
+        words_with_weights[current_word] = words_with_weights.get(current_word, 0) + 1
+
+    return words_with_weights
+
 
 
 def rolling_hash_64(word, p=53):
@@ -77,30 +100,41 @@ def rolling_hash_64(word, p=53):
     return value
 
 
-def simhash_from_frequencies(frequencies):
-    bit_sums = [0] * 64
-    for word, weight in frequencies.items():
-        h = rolling_hash_64(word)
-        for bit_index in range(64):
-            bit = (h >> bit_index) & 1
-            if bit == 1:
-                bit_sums[bit_index] += weight
-            else:
-                bit_sums[bit_index] -= weight
-    fingerprint = 0
-    for bit_index, total in enumerate(bit_sums):
-        if total > 0:
-            fingerprint |= (1 << bit_index)
-    return fingerprint
+def compute_weighted_bit_fingerprint(word_weight_map, fingerprint_length=64):
 
+    bit_contribution_totals = [0] * fingerprint_length
+
+    for word in word_weight_map:
+
+        word_weight = word_weight_map[word]
+        hashed_value = rolling_hash_64(word)
+
+        for position in range(fingerprint_length):
+
+            extracted_bit = (hashed_value >> position) & 1
+
+            if extracted_bit == 1:
+                bit_contribution_totals[position] += word_weight
+            else:
+                bit_contribution_totals[position] -= word_weight
+
+    fingerprint_result = 0
+
+    for position in range(fingerprint_length):
+        if bit_contribution_totals[position] > 0:
+            fingerprint_result |= (1 << position)
+
+    return fingerprint_result
+
+    
 
 def simhash_for_text(text):
-    frequencies = word_frequencies(text)
-    return simhash_from_frequencies(frequencies)
+    word_weight_map = build_word_weight_map(text)
+    return compute_weighted_bit_fingerprint(word_weight_map)
 
 
-def count_common_bits(hash_a, hash_b):
-    xor_value = hash_a ^ hash_b
+def count_common_bits(fingerprint_a, fingerprint_b):
+    xor_value = fingerprint_a ^ fingerprint_b
     different_bits = bin(xor_value).count("1")
     return 64 - different_bits
 
