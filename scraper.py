@@ -157,9 +157,9 @@ def print_results_with_prefix(prefix, title, body_text, links, simhash):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python scraper.py <URL1> <URL2>", file=sys.stderr)
-        print("Example: python scraper.py https://sitare.org.", file=sys.stderr)
-        print("Example: python scraper.py https://sitare.org https://example.com", file=sys.stderr)
+        print("Usage: python scraper.py <URL1> <URL2>")
+        print("Example: python scraper.py https://sitare.org.")
+        print("Example: python scraper.py https://sitare.org https://example.com")
         sys.exit(1)
 
     url = sys.argv[1]
