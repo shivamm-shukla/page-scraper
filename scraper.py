@@ -156,9 +156,8 @@ def print_results_with_prefix(prefix, page_tittle, body_text, final_links, simha
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python scraper.py <URL1> <URL2>")
-        print("Example: python scraper.py https://sitare.org.")
-        print("Example: python scraper.py https://sitare.org https://example.com")
+        print("Please Enter: python3 scraper.py https://sitare.org.")
+        print("Or python3 scraper.py https://sitare.org https://example.com")
         sys.exit(1)
 
     url = sys.argv[1]
