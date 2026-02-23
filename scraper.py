@@ -180,10 +180,10 @@ def main():
         else:
             print_results(title, body_text, links, simhash)
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching the URL: {e}", file=sys.stderr)
+        print(f"Error fetching the URL: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"Error parsing the page: {e}", file=sys.stderr)
+        print(f"Error parsing the page: {e}")
         sys.exit(1)
 
 
