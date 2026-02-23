@@ -11,18 +11,17 @@ def normalize_url(url):
 
 
 def fetch_html(url):
-    headers = {
+    agent_name_header = {
         "User-Agent": "Mozilla/5.0"
     }
 
-    response = requests.get(url, headers=headers, timeout = 10)
-
-    if response.status_code != 200:
+    page_response = requests.get(url, headers=agent_name_header, timeout = 10)
+    if page_response.status_code != 200:
         raise Exception(
-            f"Failed to fetch {url}. Status Code: {response.status_code}"
+            f"Failed to fetch {url}. Status Code: {page_response.status_code}"
         )
 
-    return response.text
+    return page_response.text
 
 
 def extract_title(soup):
@@ -43,23 +42,23 @@ def extract_body_text(soup):
 
 
 def extract_links(soup, base_url):
-    links = set()
+    final_links = set()
     for anchor_tag in soup.find_all("a", href=True):
         link = anchor_tag["href"]
         absolute_url = urljoin(base_url, link)
         if absolute_url.startswith("http://") or absolute_url.startswith("https://"):
-            links.add(absolute_url)
-    return sorted(links)
+            final_links.add(absolute_url)
+    return sorted(final_links)
 
 
-def scrape_page(url):
+def crawl_page(url):
     normalized_url = normalize_url(url)
     html = fetch_html(normalized_url)
     soup = BeautifulSoup(html, "html.parser")
-    title = extract_title(soup)
+    page_tittle = extract_title(soup)
     body_text = extract_body_text(soup)
-    links = extract_links(soup, normalized_url)
-    return title, body_text, links
+    final_links = extract_links(soup, normalized_url)
+    return page_tittle, body_text, final_links
 
 
 def build_word_weight_map(input_text):
@@ -133,25 +132,25 @@ def simhash_for_text(text):
     return compute_weighted_bit_fingerprint(word_weight_map)
 
 
-def count_common_bits(fingerprint_a, fingerprint_b):
+def find_common_bits(fingerprint_a, fingerprint_b):
     xor_value = fingerprint_a ^ fingerprint_b
     different_bits = bin(xor_value).count("1")
     return 64 - different_bits
 
 
-def print_results(title, body_text, links, simhash):
-    print(f"TITLE: {title}")
+def print_results(page_tittle, body_text, final_links, simhash):
+    print(f"TITLE: {page_tittle}")
     print(f"BODY: {body_text}")
     print(f"SIMHASH: {simhash:064b}")
-    for link in links:
+    for link in final_links:
         print(f"LINK: {link}")
 
 
-def print_results_with_prefix(prefix, title, body_text, links, simhash):
-    print(f"{prefix}_TITLE: {title}")
+def print_results_with_prefix(prefix, page_tittle, body_text, final_links, simhash):
+    print(f"{prefix}_TITLE: {page_tittle}")
     print(f"{prefix}_BODY: {body_text}")
     print(f"{prefix}_SIMHASH: {simhash:064b}")
-    for link in links:
+    for link in final_links:
         print(f"{prefix}_LINK: {link}")
 
 
@@ -165,20 +164,20 @@ def main():
     url = sys.argv[1]
     second_url = sys.argv[2] if len(sys.argv) > 2 else None
     try:
-        title, body_text, links = scrape_page(url)
+        page_tittle, body_text, final_links = crawl_page(url)
         simhash = simhash_for_text(body_text)
         if second_url:
-            second_title, second_body_text, second_links = scrape_page(second_url)
+            second_title, second_body_text, second_links = crawl_page(second_url)
             second_simhash = simhash_for_text(second_body_text)
-            print_results_with_prefix("URL1", title, body_text, links, simhash)
+            print_results_with_prefix("URL1", page_tittle, body_text, final_links, simhash)
             print_results_with_prefix(
                 "URL2", second_title, second_body_text, second_links, second_simhash
             )
-            common_bits = count_common_bits(simhash, second_simhash)
+            common_bits = find_common_bits(simhash, second_simhash)
             print()
             print(f"COMMON_BITS: {common_bits}")
         else:
-            print_results(title, body_text, links, simhash)
+            print_results(page_tittle, body_text, final_links, simhash)
     except requests.exceptions.RequestException as e:
         print(f"Error fetching the URL: {e}")
         sys.exit(1)
