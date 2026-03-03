@@ -11,33 +11,33 @@ except ImportError:
     sys.exit(1)
 
 
-class PageMiner:
+class PageScraper:
 
-    def __init__(self, raw_address):
-        self.target = self._format_address(raw_address)
+    def __init__(self, input_address):
+        self.target = self.formatWebPageAddress(input_address)
         self.page_heading = ""
-        self.text_block = ""
-        self.hyperlinks = []
+        self.body_texts = ""
+        self.all_outlinks = []
 
-    def _format_address(self, address):
-        if not address.startswith(("http://", "https://")):
-            return "https://" + address
-        return address
+    def formatWebPageAddress(self, page_address):
+        if not page_address.startswith(("http://", "https://")):
+            return "https://" + page_address
+        return page_address
 
-    def _gather_links(self, browser_page):
-        discovered = set()
+    def collectAllLinks(self, browser_page):
+        visited_links = set()
         anchor_nodes = browser_page.query_selector_all("a[href]")
 
         for node in anchor_nodes:
             ref = node.get_attribute("href")
             if ref:
-                absolute_path = urljoin(self.target, ref)
-                if absolute_path.startswith(("http://", "https://")):
-                    discovered.add(absolute_path)
+                final_path = urljoin(self.target, ref)
+                if final_path.startswith(("http://", "https://")):
+                    visited_links.add(final_path)
 
-        return sorted(discovered)
+        return sorted(visited_links)
 
-    def execute(self):
+    def startScraping(self):
         with sync_playwright() as engine:
             chromium = engine.chromium.launch(headless=True)
             tab = chromium.new_page()
@@ -45,10 +45,8 @@ class PageMiner:
             tab.goto(self.target, timeout=60000)
             tab.wait_for_load_state("networkidle")
 
-            # Capture title
             self.page_heading = tab.title().strip()
 
-            # Remove non-visible elements inside browser
             tab.evaluate("""
                 () => {
                     document.querySelectorAll('script, style, noscript')
@@ -56,21 +54,17 @@ class PageMiner:
                 }
             """)
 
-            # Capture visible body text
-            self.text_block = tab.inner_text("body").strip()
+            self.body_texts = tab.inner_text("body").strip()
 
-            # Capture hyperlinks
-            self.hyperlinks = self._gather_links(tab)
+            self.all_outlinks = self.collectAllLinks(tab)
 
             chromium.close()
 
-    def display(self):
-        print(self.page_heading)
-        print()
-        print(self.text_block)
-        print()
-        for item in self.hyperlinks:
-            print(item)
+    def toShowOutput(self):
+        print(f"Tittle: {self.page_heading}")
+        print(f"Body Texts: {self.body_texts}")
+        for i in range(len(self.all_outlinks)):
+            print(f"{i + 1}: {self.all_outlinks[i]}")
 
 
 def main():
@@ -78,13 +72,13 @@ def main():
         print("Usage: python scraper.py <url>")
         sys.exit(1)
 
-    worker = PageMiner(sys.argv[1])
+    scraprObj = PageScraper(sys.argv[1])
 
     try:
-        worker.execute()
-        worker.display()
-    except Exception as fault:
-        print(f"Runtime Error: {fault}")
+        scraprObj.startScraping()
+        scraprObj.toShowOutput()
+    except Exception as error:
+        print(f"Runtime Error: {error}")
         sys.exit(1)
 
 
