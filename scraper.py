@@ -4,13 +4,13 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 
-def normalize_url(url):
+def correctTheUrl(url):
     if url.startswith("http://") or url.startswith("https://"):
         return url
     return f"https://{url}"
 
 
-def fetch_html(url):
+def dounloadFullHtml(url):
     agent_name_header = {
         "User-Agent": "Mozilla/5.0"
     }
@@ -24,14 +24,14 @@ def fetch_html(url):
     return page_response.text
 
 
-def extract_title(soup):
-    title_tag = soup.find("title")
+def findTittleText(soup):
+    title_tag = soup.title
     if title_tag:
         return title_tag.get_text(strip=True)
     return ""
 
 
-def extract_body_text(soup):
+def findBodyText(soup):
     for script_or_style in soup.find_all(["script", "style"]):
         script_or_style.decompose()
     body = soup.find("body")
@@ -41,7 +41,7 @@ def extract_body_text(soup):
         return ""
 
 
-def extract_links(soup, base_url):
+def findAllOutlinks(soup, base_url):
     final_links = set()
     for anchor_tag in soup.find_all("a", href=True):
         link = anchor_tag["href"]
@@ -51,21 +51,21 @@ def extract_links(soup, base_url):
     return sorted(final_links)
 
 
-def crawl_page(url):
-    normalized_url = normalize_url(url)
-    html = fetch_html(normalized_url)
+def startScraping(url):
+    normalized_url = correctTheUrl(url)
+    html = dounloadFullHtml(normalized_url)
     soup = BeautifulSoup(html, "html.parser")
-    page_tittle = extract_title(soup)
-    body_text = extract_body_text(soup)
-    final_links = extract_links(soup, normalized_url)
+    page_tittle = findTittleText(soup)
+    body_text = findBodyText(soup)
+    final_links = findAllOutlinks(soup, normalized_url)
     return page_tittle, body_text, final_links
 
 
 def print_results(page_tittle, body_text, final_links):
-    print(page_tittle)
-    print(body_text)
-    for link in final_links:
-        print(f"LINK: {link}")
+    print(f"Page Tittle: {page_tittle}")
+    print(f"Body Texts: {body_text}")
+    for i in range(len(final_links)):
+        print(f"Outlink {i + 1}: {final_links[i]}")
 
 
 def main():
@@ -75,7 +75,7 @@ def main():
 
     url = sys.argv[1]
     try:
-        page_tittle, body_text, final_links = crawl_page(url)
+        page_tittle, body_text, final_links = startScraping(url)
         print_results(page_tittle, body_text, final_links)
     except requests.exceptions.RequestException as e:
         print(f"Error fetching the URL: {e}")
