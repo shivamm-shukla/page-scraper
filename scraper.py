@@ -1,89 +1,86 @@
 import sys
-import requests
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-
-def correctTheUrl(url):
-    if url.startswith("http://") or url.startswith("https://"):
-        return url
-    return f"https://{url}"
-
-
-def dounloadFullHtml(url):
-    agent_name_header = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    page_response = requests.get(url, headers=agent_name_header, timeout = 10)
-    if page_response.status_code != 200:
-        raise Exception(
-            f"Failed to fetch {url}. Status Code: {page_response.status_code}"
-        )
-
-    return page_response.text
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    print("Playwright module not found.")
+    print("Install using:")
+    print("pip install playwright")
+    print("playwright install")
+    sys.exit(1)
 
 
-def findTittleText(soup):
-    title_tag = soup.title
-    if title_tag:
-        return title_tag.get_text(strip=True)
-    return ""
+class PageScraper:
 
+    def __init__(self, input_address):
+        self.target = self.formatWebPageAddress(input_address)
+        self.page_heading = ""
+        self.body_texts = ""
+        self.all_outlinks = []
 
-def findBodyText(soup):
-    for script_or_style in soup.find_all(["script", "style"]):
-        script_or_style.decompose()
-    body = soup.find("body")
-    if body:
-        return body.get_text(separator = " ", strip = True)
-    else:
-        return ""
+    def formatWebPageAddress(self, page_address):
+        if not page_address.startswith(("http://", "https://")):
+            return "https://" + page_address
+        return page_address
 
+    def collectAllLinks(self, browser_page):
+        visited_links = set()
+        anchor_nodes = browser_page.query_selector_all("a[href]")
 
-def findAllOutlinks(soup, base_url):
-    final_links = set()
-    for anchor_tag in soup.find_all("a", href=True):
-        link = anchor_tag["href"]
-        absolute_url = urljoin(base_url, link)
-        if absolute_url.startswith("http://") or absolute_url.startswith("https://"):
-            final_links.add(absolute_url)
-    return sorted(final_links)
+        for node in anchor_nodes:
+            ref = node.get_attribute("href")
+            if ref:
+                final_path = urljoin(self.target, ref)
+                if final_path.startswith(("http://", "https://")):
+                    visited_links.add(final_path)
 
+        return sorted(visited_links)
 
-def startScraping(url):
-    normalized_url = correctTheUrl(url)
-    html = dounloadFullHtml(normalized_url)
-    soup = BeautifulSoup(html, "html.parser")
-    page_tittle = findTittleText(soup)
-    body_text = findBodyText(soup)
-    final_links = findAllOutlinks(soup, normalized_url)
-    return page_tittle, body_text, final_links
+    def startScraping(self):
+        with sync_playwright() as engine:
+            chromium = engine.chromium.launch(headless=True)
+            tab = chromium.new_page()
 
+            tab.goto(self.target, timeout=60000)
+            tab.wait_for_load_state("networkidle")
 
-def print_results(page_tittle, body_text, final_links):
-    print(f"Page Tittle: {page_tittle}")
-    print(f"Body Texts: {body_text}")
-    for i in range(len(final_links)):
-        print(f"Outlink {i + 1}: {final_links[i]}")
+            self.page_heading = tab.title().strip()
+
+            tab.evaluate("""
+                () => {
+                    document.querySelectorAll('script, style, noscript')
+                        .forEach(el => el.remove());
+                }
+            """)
+
+            self.body_texts = tab.inner_text("body").strip()
+
+            self.all_outlinks = self.collectAllLinks(tab)
+
+            chromium.close()
+
+    def toShowOutput(self):
+        print(f"Tittle: {self.page_heading}")
+        print(f"Body Texts: {self.body_texts}")
+        for i in range(len(self.all_outlinks)):
+            print(f"{i + 1}: {self.all_outlinks[i]}")
 
 
 def main():
     if len(sys.argv) != 2:
-        print("Please Enter: python3 scraper.py https://sitare.org.")
+        print("Usage: python scraper.py <url>")
         sys.exit(1)
 
-    url = sys.argv[1]
+    scraprObj = PageScraper(sys.argv[1])
+
     try:
-        page_tittle, body_text, final_links = startScraping(url)
-        print_results(page_tittle, body_text, final_links)
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the URL: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error parsing the page: {e}")
+        scraprObj.startScraping()
+        scraprObj.toShowOutput()
+    except Exception as error:
+        print(f"Runtime Error: {error}")
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
