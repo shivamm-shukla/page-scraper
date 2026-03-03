@@ -69,7 +69,8 @@ class PageScraper:
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python scraper.py <url>")
+        print("Please enter a valid command line argument")
+        print("Example: python3 scraper.py https://sitare.org/")
         sys.exit(1)
 
     scraprObj = PageScraper(sys.argv[1])
